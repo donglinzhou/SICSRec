@@ -115,12 +115,8 @@ class CLIPLoss(nn.Module):
 def save_finetuned_model(bert_model, bert_tokenizer, swin_model, feature_extractor):
     bert_model.save_pretrained(bert_save_path)
     bert_tokenizer.save_pretrained(bert_save_path)
-    print(f"微调后的 BERT 模型和 tokenizer 已保存到 {bert_save_path}！")
-
     swin_model.save_pretrained(swin_save_path)
     feature_extractor.save_pretrained(swin_save_path)
-    print(f"Swin 模型的 preprocessor_config.json 已保存到 {swin_save_path}！")
-    print(f"微调后的 Swin 模型已保存到 {swin_save_path}！")
 
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -217,7 +213,6 @@ for epoch in range(num_epochs):
         loss_image = criterion_infonce(target_image_emb, pos_image_emb)
         loss_clip = criterion_clip(target_text_emb, target_image_emb)
 
-        # 总损失
         total_loss = loss_text + loss_image + loss_clip
         total_loss.backward()
         optimizer.step()
@@ -228,71 +223,3 @@ for epoch in range(num_epochs):
     print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss / len(dataloader)}")
 
 save_finetuned_model(bert_model, bert_tokenizer, swin_model, feature_extractor)
-
-
-# ----------------- 微调效果验证 -----------------
-#
-# def calculate_cosine_similarity(emb1, emb2):
-#     emb1 = emb1.detach().cpu().numpy()
-#     emb2 = emb2.detach().cpu().numpy()
-#     return cosine_similarity(emb1, emb2)
-#
-# # 加载微调前模型
-# bert_model_before = AutoModel.from_pretrained('./pretrained_models/bert-base-cased').to(device)
-# swin_model_before = SwinForImageClassification.from_pretrained('./pretrained_models/swin_base').to(device)
-# dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
-# text_similarity_before, text_similarity_after,loss_clip_before,loss_clip_after =0,0,0,0
-# image_similarity_before, image_similarity_after = 0, 0
-# times = 0
-# # 验证一个 batch
-# for text_pairs, images_batch, indices in dataloader:
-#     target_texts, pos_texts = text_pairs
-#     target_images, pos_images = images_batch
-#     target_inputs = bert_tokenizer(target_texts, return_tensors="pt", padding=True, truncation=True).to(device)
-#     pos_inputs = bert_tokenizer(pos_texts, return_tensors="pt", padding=True, truncation=True).to(device)
-#     times += 1
-#     # 文本对处理：分别处理目标样本和正样本
-#     with torch.no_grad():
-#         # 微调前：获取文本嵌入
-#         target_text_emb_p = bert_model_before(**target_inputs).pooler_output  # (batch_size, hidden_size)
-#         pos_text_emb_p = bert_model_before(**pos_inputs).pooler_output  # (batch_size, hidden_size)
-#         text_similarity_before += calculate_cosine_similarity(target_text_emb_p, pos_text_emb_p).mean()
-#
-#         # 微调后：获取文本嵌入
-#         target_text_emb_n = bert_model(**target_inputs).pooler_output  # (batch_size, hidden_size)
-#         pos_text_emb_n = bert_model(**pos_inputs).pooler_output  # (batch_size, hidden_size)
-#         text_similarity_after += calculate_cosine_similarity(target_text_emb_n, pos_text_emb_n).mean()
-#
-#     # 图像对处理：分别处理目标样本和正样本
-#     target_images = target_images.to(device)
-#     pos_images = pos_images.to(device)
-#
-#     with torch.no_grad():
-#         # 微调前：获取图像嵌入
-#         target_image_emb_p = swin_model_before(target_images).logits  # (batch_size, hidden_size)
-#         pos_image_emb_p = swin_model_before(pos_images).logits  # (batch_size, hidden_size)
-#         image_similarity_before += calculate_cosine_similarity(target_image_emb_p, pos_image_emb_p).mean()
-#
-#         # 微调后：获取图像嵌入
-#         target_image_emb_n = swin_model(target_images).logits  # (batch_size, hidden_size)
-#         pos_image_emb_n = swin_model(pos_images).logits  # (batch_size, hidden_size)
-#         image_similarity_after += calculate_cosine_similarity(target_image_emb_n, pos_image_emb_n).mean()
-#
-#     # MLP 和 CLIP 损失计算
-#     with torch.no_grad():
-#         # 微调前的嵌入适配与损失计算
-#         target_text_emb_adapted_p, pos_text_emb_adapted_p = textAdapter(target_text_emb_p, pos_text_emb_p)
-#         target_image_emb_adapted_p, pos_image_emb_adapted_p = imageAdapter(target_image_emb_p, pos_image_emb_p)
-#         loss_clip_before += criterion_clip(target_text_emb_adapted_p, target_image_emb_adapted_p).item()
-#
-#         # 微调后的嵌入适配与损失计算
-#         target_text_emb_adapted_n, pos_text_emb_adapted_n = textAdapter(target_text_emb_n, pos_text_emb_n)
-#         target_image_emb_adapted_n, pos_image_emb_adapted_n = imageAdapter(target_image_emb_n, pos_image_emb_n)
-#         loss_clip_after += criterion_clip(target_text_emb_adapted_n, target_image_emb_adapted_n).item()
-#
-# print("微调前的文本相似度: ", text_similarity_before / times)
-# print("微调后的文本相似度: ", text_similarity_after / times)
-# print("微调前的图片相似度: ", image_similarity_before / times)
-# print("微调后的图片相似度: ", image_similarity_after / times)
-# print("微调前的CLIP loss: ", loss_clip_before  / times)
-# print("微调后的CLIP loss: ", loss_clip_after  / times)
