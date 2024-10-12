@@ -210,7 +210,6 @@ class BiGNNLayer(nn.Module):
 
     def forward(self, lap_matrix, eye_matrix, features):
         # for GCF ajdMat is a (N+M) by (N+M) mat
-        # lap_matrix L = D^-1(A)D^-1 # 拉普拉斯矩阵
         x = torch.sparse.mm(lap_matrix, features)
 
         inter_part1 = self.linear(features + x)
@@ -829,7 +828,7 @@ class TransformerDecoder(nn.Module):
             decoder_output = layer(input_tensor_query, input_tensor_content, cross_attention_mask)
             all_decoder_layers.append(decoder_output)
         if not output_all_encoded_layers:
-            all_decoder_layers = [all_decoder_layers[-1]]  # 只返回最后一个解码器层的输出
+            all_decoder_layers = [all_decoder_layers[-1]]  
         return all_decoder_layers
 
 
