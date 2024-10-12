@@ -54,7 +54,6 @@ class UniSRecDataset(SequentialDataset):
         self.plm_embedding_image = self.weight2emb(plm_embedding_weight_image, self.plm_image_size)
 
     def load_plm_embedding(self, image='_image_llm_', text='_text_llm_'):
-        # image 和 text 标识改一下
         feat_path_text = osp.join(self.config['data_path'], f'{self.dataset_name}{text}{self.stage}.{self.plm_suffix}')
         tensor_text = torch.load(feat_path_text, map_location=self.config['device']) #(4724,768)
         padding_embedding = torch.zeros(1, self.plm_text_size).to(self.config['device'])
