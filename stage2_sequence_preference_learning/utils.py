@@ -83,7 +83,7 @@ class InfoNCELoss(nn.Module):
 
         return info_nce_loss
 
-class NTXentLoss(torch.nn.Module):  # 不加标签信息的loss
+class NTXentLoss(torch.nn.Module):  
     def __init__(self, temperature=0.1, eps=1e-6):
         super(NTXentLoss, self).__init__()
         self.temperature = temperature
