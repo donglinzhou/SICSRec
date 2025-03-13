@@ -1,6 +1,6 @@
 
 The source code for our "Self-Supervised Representation Learning with ID-Content
-Modality Alignment for Sequential Recommendation"
+Modality Alignment for Sequential Recommendation".
 
 # 1. Requirements
 
