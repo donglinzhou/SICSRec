@@ -1,19 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Time   : 2020/6/27 16:40
-# @Author : Shanlei Mu
-# @Email  : slmu@ruc.edu.cn
-# @File   : layers.py
 
-# UPDATE:
-# @Time   : 2022/7/16, 2020/8/24 14:58, 2020/9/16, 2020/9/21, 2020/10/9, 2021/05/01
-# @Author : Zhen Tian, Yujie Lu, Xingyu Pan, Zhichao Feng, Hui Wang, Xinyan Fan
-# @Email  : chenyuwuxinn@gmail.com, yujielu1998@gmail.com, panxy@ruc.edu.cn, fzcbupt@gmail.com, hui.wang@ruc.edu.cn, xinyan.fan@ruc.edu.cn
-
-"""
-recbole.model.layers
-#############################
-Common Layers in recommender system
-"""
 
 import copy
 import math
@@ -650,12 +635,8 @@ class LoRALayer(nn.Module):
     def init_lora_weights(self):
         # Initialize lora_A with a standard normal distribution
         nn.init.normal_(self.lora_A.weight, mean=0.0, std=0.02)
-
-        # Initialize lora_B with a scaled normal distribution
-        nn.init.normal_(self.lora_B.weight, mean=0.0, std=0.02)
-
-        # Scale lora_B by alpha/r to ensure the rank of the update is controlled
-        self.lora_B.weight.data *= self.alpha / self.r
+        # Initialize lora_B with zeros
+        nn.init.zeros_(self.lora_B.weight)
 
     def forward(self, x):
         return x + self.lora_B(self.lora_A(x))
@@ -712,6 +693,7 @@ class TransformerLayer(nn.Module):
         if self.add_lora:
             feedforward_output = self.ffw_lora_layer(feedforward_output)
         return feedforward_output
+
 
 class TransformerEncoder(nn.Module):
     r"""One TransformerEncoder consists of several TransformerLayers.
@@ -845,23 +827,5 @@ class TransformerDecoder(nn.Module):
             decoder_output = layer(input_tensor_query, input_tensor_content, cross_attention_mask)
             all_decoder_layers.append(decoder_output)
         if not output_all_encoded_layers:
-            all_decoder_layers = [all_decoder_layers[-1]]  # 只返回最后一个解码器层的输出
+            all_decoder_layers = [all_decoder_layers[-1]]
         return all_decoder_layers
-
-
-class ItemToInterestAggregation(nn.Module):
-    def __init__(self, seq_len, hidden_size, k_interests=5):
-        super().__init__()
-        self.k_interests = k_interests  # k latent interests
-        self.theta = nn.Parameter(torch.randn([hidden_size, k_interests]))
-
-    def forward(self, input_tensor):  # [B, L, d] -> [B, k, d]
-        D_matrix = torch.matmul(input_tensor, self.theta)  # [B, L, k]
-        D_matrix = nn.Softmax(dim=-2)(D_matrix)
-        result = torch.einsum("nij, nik -> nkj", input_tensor, D_matrix)  # #[B, k, d]
-
-        return result
-
-
-
-
