@@ -1,35 +1,29 @@
-import torch
+
 import os
 import pandas as pd
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import re
 
+# Please install OpenAI SDK first: `pip3 install openai`
+
+from openai import OpenAI
+
+
 if __name__ == "__main__":
-    category = "Bili_Movie"
+    category = "Bili_Dance" # Dance
     file = "Downstream_datasets"
     data_directory = f'./{file}/{category}/'
     meta_file_path = os.path.join(data_directory, f'{category}_item_sort.csv')
 
     sequential_data_path = f'./{file}/{category}/sequential_data.txt'
-    output_id_path = f'./{file}/{category}/item_pairs_id.txt'
-    output_cn_path = f'./{file}/{category}/item_pairs_cn.txt'
-    output_en_path = f'./{file}/{category}/item_pairs_en.txt'
+    output_id_path = f'./{file}/{category}/item_pairs_id_ds_v2.txt'
+    output_cn_path = f'./{file}/{category}/item_pairs_cn_ds_v2.txt'
+    output_en_path = f'./{file}/{category}/item_pairs_en_ds_v2.txt'
 
     column_names = ['item_id', 'chinese_title', 'english_title']
     df = pd.read_csv(meta_file_path, header=None, names=column_names, encoding='utf-8')
     df.sort_values(by='item_id', inplace=True)
     df.reset_index(drop=True, inplace=True)
-
-    device = "cuda:1"
-
-    path = './glm-4-chat/'
-    tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)  #
-    model = AutoModelForCausalLM.from_pretrained(
-        path,
-        torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-        trust_remote_code=True
-    ).to(device).eval()
+    client = OpenAI(api_key="", base_url="")
 
     with open(sequential_data_path, 'r') as file:
         lines = file.readlines()
@@ -57,53 +51,73 @@ if __name__ == "__main__":
             )
 
             query = (
-                f"你是一个视频相似度判断助手。我会给你一个目标视频和一组候选视频，请帮我找出候选视频中与目标视频最相似的一个。"
+                f"我会给你一个目标视频和一组候选视频，请帮我找出候选视频中与目标视频最相似的一个。"
                 f"目标视频是 {target_item}-{target_cn_title}，候选视频列表是 {candidate_item_descriptions}。"
-                "请你在候选视频中找到与目标视频最相似的，并按以下格式输出: 相似视频ID-相似视频标题。"
-                "例如: 3-花园酒店。如果没有相似的视频，请直接输出-1。请确保格式正确，其他形式的输出都是非法的。")
+                "请你在候选视频中找到与目标视频最相似的，并按以下格式输出: 目标视频ID-最相似视频ID。"
+                "例如: 123-456。如果候选视频中没有相似的视频，请直接输出 -1,-1。请确保格式正确，其他形式的输出都是非法的。"
+            )
 
-            inputs = tokenizer.apply_chat_template([{"role": "user", "content": query}],
-                                                   add_generation_prompt=True,
-                                                   tokenize=True,
-                                                   return_tensors="pt",
-                                                   return_dict=True
-                                                   )
+            response = client.chat.completions.create(
+                model="",
+                messages=[
+                    {"role": "system", "content": "你是一个视频相似度判断助手。"},
+                    {"role": "user", "content": query},
+                ],
+                stream=False
+            )
 
-            inputs = inputs.to(device)
-            gen_kwargs = {"max_length": 15000, "do_sample": True, "top_k": 1}
-            with torch.no_grad():
-                outputs = model.generate(**inputs, **gen_kwargs)
-                outputs = outputs[:, inputs['input_ids'].shape[1]:]
-                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                print(response)
+            print(response.choices[0].message.content)
+            content = response.choices[0].message.content
 
-            pattern = r"^(\d+)-([^,]+)$"
-            match = re.match(pattern, response.strip())
+            pattern = r"^(-?\d+)-(-?\d+)$"
+            match = re.match(pattern, content.strip())
 
             if match:
-                most_similar_item = match.group(1).strip()
-                if most_similar_item == '-1':
-                    most_similar_item = -1
-                    most_similar_title = None
-                else:
-                    most_similar_item = int(most_similar_item)
-                    most_similar_title = match.group(2).strip()
+                target_out_id = match.group(1).strip()
+                similar_out_id = match.group(2).strip()
 
-                if most_similar_item != -1:
-                    print(f"目标视频对：目标视频ID={target_item},目标视频标题={target_cn_title}")
-                    print(f"合法输出: 最相似视频ID={most_similar_item}, 最相似视频标题={most_similar_title}")
-                else:
-                    print("没有找到相似视频")
+                try:
+                    target_out_id = int(target_out_id)
+                    similar_out_id = int(similar_out_id)
+                except ValueError:
+                    print(f"  Invalid ID format in output: {content}. Skipping.")
                     continue
+
+                if target_out_id == -1 and similar_out_id == -1:
+                    print(f"  No similar video found for target {target_item}.")
+                    continue  
+                elif target_out_id != target_item:
+                    print(f"  Mismatched target ID in output: Expected {target_item}, got {target_out_id}. Skipping.")
+                    continue  
+                elif similar_out_id not in candidate_items:
+                    print(f"  Similar ID {similar_out_id} not in candidate list {candidate_items}. Skipping.")
+                    continue  
+                elif similar_out_id == -1:
+                    print(f"  Found target {target_item}, but no similar candidate found by LLM.")
+                    continue  
+                else:
+                    print(f"  Valid output: Target ID={target_out_id}, Similar ID={similar_out_id}")
+
+                   
+                    try:
+                        similar_cn_title = df.loc[df['item_id'] == similar_out_id, 'chinese_title'].squeeze()
+                        similar_en_title = df.loc[df['item_id'] == similar_out_id, 'english_title'].squeeze()
+                       
+                        if pd.isna(similar_cn_title) or pd.isna(similar_en_title):
+                            print(f"  Missing title for item ID {similar_out_id}. Skipping.")
+                            continue
+                    except Exception as e:
+                        print(f"  Error fetching titles for ID {similar_out_id}: {e}. Skipping.")
+                        continue
+
+                 
+                    id_file.write(f"{target_out_id},{similar_out_id}\n")
+                    cn_file.write(f"{target_cn_title},{similar_cn_title}\n")
+                    en_file.write(f"{target_en_title},{similar_en_title}\n")
+                    print(f"  Successfully wrote pair: {target_out_id} -> {similar_out_id}\n")
+
             else:
-                print("非法输出，跳过处理")
+                print(f"  Illegal output format: {content}. Skipping.")
                 continue
 
-            if most_similar_item != -1:
-                similar_cn_title = df.loc[df['item_id'] == most_similar_item, 'chinese_title'].squeeze() or "无"
-                similar_en_title = df.loc[df['item_id'] == most_similar_item, 'english_title'].squeeze() or "None"
-                id_file.write(f"{target_item},{most_similar_item}\n")
-                cn_file.write(f"{target_cn_title},{similar_cn_title}\n")
-                en_file.write(f"{target_en_title},{similar_en_title}\n")
-
-    print("finish!")
+        print("Processing finished!")
