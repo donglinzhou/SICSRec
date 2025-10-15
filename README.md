@@ -20,8 +20,8 @@ We conduct experiments on a Tesla V100 PCIe GPU with 32GB memory, and our code i
 
 3.  Text and image embeddings weights are `category_text_llm_stage1.pth` and `category_image_llm_stage1.pth`, respectively.
 ## 3. Pretrained model
-
-You need to download [ChatGLM-4 9B](https://modelscope.cn/models/ZhipuAI/glm-4-9b-chat/file/view/master?fileName=LICENSE&status=0) and place it into `./stage1_content_modality_semantic_alignment/glm-4-chat`.
+Take GLM as an example, you can choose to download [ChatGLM-4 9B](https://modelscope.cn/models/ZhipuAI/glm-4-9b-chat/file/view/master?fileName=LICENSE&status=0) and place it into `./stage1_content_modality_semantic_alignment/glm-4-chat`, and then load the weight to infer.
+We recommend using the API of an LLM to generate similar item pairs from user interaction data. 
 
 Moreover, you need to download the pre-trained models [google-bert/bert-base-uncased](https://huggingface.co/google-bert/bert-base-uncased) and [microsoft/swin-base-patch4-window7-224](https://huggingface.co/microsoft/swin-base-patch4-window7-224) and place them into `./stage1_content_modality_semantic_alignment/pretrained_models`.
 
